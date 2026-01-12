@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background-color: #f5f5f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Barra de herramientas */
+        .toolbar {
+            background-color: #e0e0e0;
+            padding: 8px 12px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-spacer {
+            flex: 1;
+        }
+
+        .toolbar button.theme-toggle {
+            margin-left: auto;
+            font-size: 18px;
+            padding: 6px 10px;
+        }
+
+        .toolbar button {
+            padding: 6px 12px;
+            background-color: #fff;
+            border: 1px solid #999;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .toolbar button:hover {
+            background-color: #f0f0f0;
+        }
+
+        .toolbar button:active {
+            background-color: #e0e0e0;
+        }
+
+        /* Contenedor de pestañas */
+        .tabs-container {
+            background-color: #e0e0e0;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: thin;
+        }
+
+        .tabs-container::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .tabs-container::-webkit-scrollbar-track {
+            background: #e0e0e0;
+        }
+
+        .tabs-container::-webkit-scrollbar-thumb {
+            background: #999;
+            border-radius: 4px;
+        }
+
+        .tabs-wrapper {
+            display: flex;
+            min-width: 100%;
+        }
+
+        .tab {
+            background-color: #fff;
+            border: 1px solid #999;
+            border-bottom: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 120px;
+            max-width: 200px;
+            position: relative;
+            user-select: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tab:not(:last-child) {
+            border-right: none;
+        }
+
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+            z-index: 1;
+        }
+
+        .tab.dragging {
+            opacity: 0.5;
+        }
+
+        .tab.drag-over {
+            border-left: 2px solid #4a9eff;
+        }
+
+        .tab-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tab-name.editing {
+            display: none;
+        }
+
+        .tab-name-input {
+            flex: 1;
+            border: 1px solid #4a9eff;
+            padding: 2px 4px;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            background-color: #fff;
+        }
+
+        .tab-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            padding: 0;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .tab-close:hover {
+            background-color: #ff4444;
+            color: #fff;
+        }
+
+        .tab-new {
+            background-color: #e0e0e0;
+            border: 1px solid #999;
+            border-bottom: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            flex-shrink: 0;
+        }
+
+        .tab-new:hover {
+            background-color: #d0d0d0;
+        }
+
+        /* Área del editor */
+        .editor-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .line-numbers {
+            background-color: #f0f0f0;
+            color: #666;
+            padding: 10px 8px;
+            text-align: right;
+            font-size: 14px;
+            line-height: 1.5;
+            user-select: none;
+            overflow: hidden;
+            border-right: 1px solid #ccc;
+            min-width: 50px;
+            white-space: pre;
+        }
+
+        .editor-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            background-color: #fff;
+            color: #333;
+            tab-size: 4;
+        }
+
+        /* Barra de estado */
+        .status-bar {
+            background-color: #e0e0e0;
+            border-top: 1px solid #ccc;
+            padding: 4px 12px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 16px;
+        }
+
+        /* Panel de búsqueda/reemplazo */
+        .search-panel {
+            background-color: #e0e0e0;
+            border-bottom: 1px solid #ccc;
+            padding: 8px 12px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .search-panel.active {
+            display: flex;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .search-input-group {
+            display: flex;
+            flex: 1;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .search-input-group input {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .search-input-group label {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .search-options {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .search-options label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .search-options input[type="checkbox"] {
+            cursor: pointer;
+        }
+
+        .search-results {
+            font-size: 12px;
+            color: #666;
+            padding: 4px 0;
+        }
+
+        /* Menú contextual de pestaña */
+        .tab-context-menu {
+            position: fixed;
+            background-color: #fff;
+            border: 1px solid #999;
+            border-radius: 3px;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            display: none;
+            flex-direction: column;
+            z-index: 1000;
+            min-width: 150px;
+        }
+
+        .tab-context-menu.active {
+            display: flex;
+        }
+
+        .tab-context-menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            border: none;
+            background: none;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .tab-context-menu-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .tab-context-menu-item:not(:last-child) {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        /* Modal de guardado */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background-color: #fff;
+            border: 1px solid #999;
+            border-radius: 5px;
+            padding: 20px;
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .modal-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .modal-field label {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .modal-field input,
+        .modal-field select {
+            padding: 8px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        .modal-field input:focus,
+        .modal-field select:focus {
+            outline: none;
+            border-color: #4a9eff;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .modal-footer button {
+            padding: 8px 16px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .modal-footer button.btn-primary {
+            background-color: #4a9eff;
+            color: #fff;
+            border-color: #4a9eff;
+        }
+
+        .modal-footer button.btn-primary:hover {
+            background-color: #357abd;
+        }
+
+        .modal-footer button.btn-secondary {
+            background-color: #fff;
+            color: #333;
+        }
+
+        .modal-footer button.btn-secondary:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Modo oscuro */
+        body.dark-mode {
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode .toolbar {
+            background-color: #2d2d2d;
+            border-bottom-color: #404040;
+        }
+
+        body.dark-mode .toolbar button {
+            background-color: #3d3d3d;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .toolbar button:hover {
+            background-color: #4d4d4d;
+        }
+
+        body.dark-mode .toolbar button:active {
+            background-color: #353535;
+        }
+
+        body.dark-mode .tabs-container {
+            background-color: #2d2d2d;
+            border-bottom-color: #404040;
+        }
+
+        body.dark-mode .tab {
+            background-color: #3d3d3d;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .tab.active {
+            background-color: #1e1e1e;
+            border-bottom-color: #1e1e1e;
+        }
+
+        body.dark-mode .tab-close {
+            color: #999;
+        }
+
+        body.dark-mode .tab-close:hover {
+            background-color: #ff4444;
+            color: #fff;
+        }
+
+        body.dark-mode .tab-new {
+            background-color: #2d2d2d;
+            border-color: #555;
+            color: #999;
+        }
+
+        body.dark-mode .tab-new:hover {
+            background-color: #3d3d3d;
+        }
+
+        body.dark-mode .line-numbers {
+            background-color: #252525;
+            color: #666;
+            border-right-color: #404040;
+        }
+
+        body.dark-mode textarea {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        body.dark-mode .status-bar {
+            background-color: #2d2d2d;
+            border-top-color: #404040;
+            color: #999;
+        }
+
+        body.dark-mode .search-panel {
+            background-color: #2d2d2d;
+            border-bottom-color: #404040;
+        }
+
+        body.dark-mode .search-input-group input {
+            background-color: #3d3d3d;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .search-input-group input:focus {
+            border-color: #4a9eff;
+        }
+
+        body.dark-mode .search-input-group label {
+            color: #999;
+        }
+
+        body.dark-mode .search-results {
+            color: #999;
+        }
+
+        body.dark-mode .tab-context-menu {
+            background-color: #3d3d3d;
+            border-color: #555;
+        }
+
+        body.dark-mode .tab-context-menu-item {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .tab-context-menu-item:hover {
+            background-color: #4d4d4d;
+        }
+
+        body.dark-mode .tab-context-menu-item:not(:last-child) {
+            border-bottom-color: #555;
+        }
+
+        body.dark-mode .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        body.dark-mode .modal {
+            background-color: #2d2d2d;
+            border-color: #555;
+        }
+
+        body.dark-mode .modal-header {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .modal-field label {
+            color: #999;
+        }
+
+        body.dark-mode .modal-field input,
+        body.dark-mode .modal-field select {
+            background-color: #3d3d3d;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .modal-field input:focus,
+        body.dark-mode .modal-field select:focus {
+            border-color: #4a9eff;
+        }
+
+        body.dark-mode .modal-footer button.btn-secondary {
+            background-color: #3d3d3d;
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .modal-footer button.btn-secondary:hover {
+            background-color: #4d4d4d;
+        }
+    </style>
+</head>
+<body>
+    <!-- Barra de herramientas -->
+    <div class="toolbar">
+        <button id="btnNew">Nueva Pestaña</button>
+        <button id="btnSave">Guardar</button>
+        <div style="width: 1px; height: 20px; background-color: #999; margin: 0 4px;"></div>
+        <button id="btnCopy">Copiar</button>
+        <button id="btnPaste">Pegar</button>
+        <button id="btnCut">Cortar</button>
+        <div style="width: 1px; height: 20px; background-color: #999; margin: 0 4px;"></div>
+        <button id="btnSearch">Buscar/Reemplazar</button>
+        <div class="toolbar-spacer"></div>
+        <button id="btnThemeToggle" class="theme-toggle" title="Cambiar tema">🌙</button>
+    </div>
+
+    <!-- Panel de búsqueda/reemplazo -->
+    <div class="search-panel" id="searchPanel">
+        <div class="search-row">
+            <div class="search-input-group">
+                <label>Buscar:</label>
+                <input type="text" id="searchInput" placeholder="Texto a buscar...">
+            </div>
+            <button id="btnSearchNext">Siguiente</button>
+            <button id="btnSearchPrev">Anterior</button>
+            <button id="btnSearchAll">Buscar en todas</button>
+            <button id="btnCloseSearch">✕</button>
+        </div>
+        <div class="search-row">
+            <div class="search-input-group">
+                <label>Reemplazar:</label>
+                <input type="text" id="replaceInput" placeholder="Texto de reemplazo...">
+            </div>
+            <button id="btnReplace">Reemplazar</button>
+            <button id="btnReplaceAll">Reemplazar todo</button>
+            <div class="search-options">
+                <label>
+                    <input type="checkbox" id="caseSensitive"> Distingue mayúsculas
+                </label>
+                <label>
+                    <input type="checkbox" id="searchAllTabs"> Buscar en todas las pestañas
+                </label>
+            </div>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <!-- Contenedor de pestañas -->
+    <div class="tabs-container">
+        <div class="tabs-wrapper" id="tabsWrapper"></div>
+        <div class="tab-new" id="btnNewTab" title="Nueva pestaña">+</div>
+    </div>
+
+    <!-- Área del editor -->
+    <div class="editor-container">
+        <div class="line-numbers" id="lineNumbers">1</div>
+        <div class="editor-wrapper">
+            <textarea id="editor" spellcheck="false"></textarea>
+        </div>
+    </div>
+
+    <!-- Barra de estado -->
+    <div class="status-bar">
+        <div class="status-left">
+            <span id="statusLine">Línea: 1</span>
+            <span id="statusCol">Columna: 1</span>
+        </div>
+    </div>
+
+    <!-- Menú contextual de pestaña -->
+    <div class="tab-context-menu" id="tabContextMenu">
+        <button class="tab-context-menu-item" id="contextRename">Renombrar</button>
+        <button class="tab-context-menu-item" id="contextClose">Cerrar</button>
+    </div>
+
+    <!-- Modal de guardado -->
+    <div class="modal-overlay" id="saveModal">
+        <div class="modal">
+            <div class="modal-header">Guardar archivo</div>
+            <div class="modal-body">
+                <div class="modal-field">
+                    <label for="saveFileName">Nombre del archivo (incluye la extensión):</label>
+                    <input type="text" id="saveFileName" placeholder="ejemplo: archivo.txt">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btnCancelSave">Cancelar</button>
+                <button class="btn-primary" id="btnConfirmSave">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TextEditor {
+            constructor() {
+                this.tabs = [];
+                this.activeTabIndex = -1;
+                this.tabCounter = 1;
+                this.draggedTab = null;
+                this.dragOverTab = null;
+                this.searchResults = [];
+                this.currentSearchIndex = -1;
+                this.contextMenuTabIndex = -1;
+
+                this.initElements();
+                this.initEventListeners();
+                this.loadTheme();
+                this.loadFromLocalStorage();
+                this.createNewTab();
+            }
+
+            initElements() {
+                this.tabsWrapper = document.getElementById('tabsWrapper');
+                this.editor = document.getElementById('editor');
+                this.lineNumbers = document.getElementById('lineNumbers');
+                this.btnNew = document.getElementById('btnNew');
+                this.btnNewTab = document.getElementById('btnNewTab');
+                this.btnSave = document.getElementById('btnSave');
+                this.statusLine = document.getElementById('statusLine');
+                this.statusCol = document.getElementById('statusCol');
+                
+                // Elementos de búsqueda
+                this.searchPanel = document.getElementById('searchPanel');
+                this.searchInput = document.getElementById('searchInput');
+                this.replaceInput = document.getElementById('replaceInput');
+                this.btnSearch = document.getElementById('btnSearch');
+                this.btnSearchNext = document.getElementById('btnSearchNext');
+                this.btnSearchPrev = document.getElementById('btnSearchPrev');
+                this.btnSearchAll = document.getElementById('btnSearchAll');
+                this.btnCloseSearch = document.getElementById('btnCloseSearch');
+                this.btnReplace = document.getElementById('btnReplace');
+                this.btnReplaceAll = document.getElementById('btnReplaceAll');
+                this.caseSensitive = document.getElementById('caseSensitive');
+                this.searchAllTabs = document.getElementById('searchAllTabs');
+                this.searchResultsElement = document.getElementById('searchResults');
+                
+                // Elementos de editor
+                this.btnCopy = document.getElementById('btnCopy');
+                this.btnPaste = document.getElementById('btnPaste');
+                this.btnCut = document.getElementById('btnCut');
+                
+                // Botón de tema
+                this.btnThemeToggle = document.getElementById('btnThemeToggle');
+                
+                // Menú contextual
+                this.tabContextMenu = document.getElementById('tabContextMenu');
+                this.contextRename = document.getElementById('contextRename');
+                this.contextClose = document.getElementById('contextClose');
+                
+                // Modal de guardado
+                this.saveModal = document.getElementById('saveModal');
+                this.saveFileName = document.getElementById('saveFileName');
+                this.btnCancelSave = document.getElementById('btnCancelSave');
+                this.btnConfirmSave = document.getElementById('btnConfirmSave');
+            }
+
+            initEventListeners() {
+                this.btnNew.addEventListener('click', () => this.createNewTab());
+                this.btnNewTab.addEventListener('click', () => this.createNewTab());
+                this.btnSave.addEventListener('click', () => this.saveFile());
+                this.editor.addEventListener('input', () => this.onEditorChange());
+                this.editor.addEventListener('scroll', () => this.syncLineNumbers());
+                this.editor.addEventListener('keyup', () => this.updateStatusBar());
+                this.editor.addEventListener('keydown', (e) => this.handleKeyDown(e));
+
+                // Event listeners de búsqueda
+                this.btnSearch.addEventListener('click', () => this.toggleSearchPanel());
+                this.btnCloseSearch.addEventListener('click', () => this.closeSearchPanel());
+                this.btnSearchNext.addEventListener('click', () => this.searchNext());
+                this.btnSearchPrev.addEventListener('click', () => this.searchPrev());
+                this.btnSearchAll.addEventListener('click', () => this.searchAllTabs());
+                this.btnReplace.addEventListener('click', () => this.replace());
+                this.btnReplaceAll.addEventListener('click', () => this.replaceAll());
+                this.searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            this.searchPrev();
+                        } else {
+                            this.searchNext();
+                        }
+                    }
+                    if (e.key === 'Escape') {
+                        this.closeSearchPanel();
+                    }
+                });
+                this.searchInput.addEventListener('input', () => this.updateSearchResults());
+
+                // Event listeners de editor
+                this.btnCopy.addEventListener('click', () => this.copy());
+                this.btnPaste.addEventListener('click', () => this.paste());
+                this.btnCut.addEventListener('click', () => this.cut());
+
+                // Event listener de tema
+                this.btnThemeToggle.addEventListener('click', () => this.toggleTheme());
+
+                // Menú contextual
+                this.contextRename.addEventListener('click', () => this.renameTabFromContext());
+                this.contextClose.addEventListener('click', () => this.closeTabFromContext());
+                document.addEventListener('click', (e) => {
+                    if (!this.tabContextMenu.contains(e.target)) {
+                        this.tabContextMenu.classList.remove('active');
+                    }
+                });
+
+                // Modal de guardado
+                this.btnCancelSave.addEventListener('click', () => this.closeSaveModal());
+                this.btnConfirmSave.addEventListener('click', () => this.confirmSave());
+                this.saveModal.addEventListener('click', (e) => {
+                    if (e.target === this.saveModal) {
+                        this.closeSaveModal();
+                    }
+                });
+                this.saveFileName.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.confirmSave();
+                    }
+                    if (e.key === 'Escape') {
+                        this.closeSaveModal();
+                    }
+                });
+
+                // Atajos de teclado globales
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.key === 's') {
+                        e.preventDefault();
+                        this.saveFile();
+                    }
+                    if (e.ctrlKey && e.key === 'm') {
+                        e.preventDefault();
+                        this.createNewTab();
+                    }
+                    if (e.ctrlKey && e.key === 'f') {
+                        e.preventDefault();
+                        this.toggleSearchPanel();
+                    }
+                    if (e.ctrlKey && e.key === 'c' && !this.searchPanel.classList.contains('active')) {
+                        // Solo si no está en el panel de búsqueda
+                        return;
+                    }
+                    if (e.ctrlKey && e.key === 'v' && !this.searchPanel.classList.contains('active')) {
+                        return;
+                    }
+                    if (e.ctrlKey && e.key === 'x' && !this.searchPanel.classList.contains('active')) {
+                        return;
+                    }
+                });
+            }
+
+            createNewTab(name = null) {
+                const tabName = name || `new ${this.tabCounter++}`;
+                const tab = {
+                    id: Date.now() + Math.random(),
+                    name: tabName,
+                    content: '',
+                    saved: false
+                };
+
+                this.tabs.push(tab);
+                this.renderTabs();
+                this.switchToTab(this.tabs.length - 1);
+                this.saveToLocalStorage();
+            }
+
+            renderTabs() {
+                this.tabsWrapper.innerHTML = '';
+                this.tabs.forEach((tab, index) => {
+                    const tabElement = this.createTabElement(tab, index);
+                    this.tabsWrapper.appendChild(tabElement);
+                });
+            }
+
+            createTabElement(tab, index) {
+                const tabDiv = document.createElement('div');
+                tabDiv.className = `tab ${index === this.activeTabIndex ? 'active' : ''}`;
+                tabDiv.draggable = true;
+                tabDiv.dataset.index = index;
+
+                const tabName = document.createElement('span');
+                tabName.className = 'tab-name';
+                tabName.textContent = tab.name;
+
+                const tabNameInput = document.createElement('input');
+                tabNameInput.type = 'text';
+                tabNameInput.className = 'tab-name-input';
+                tabNameInput.value = tab.name;
+                tabNameInput.style.display = 'none';
+
+                const tabClose = document.createElement('button');
+                tabClose.className = 'tab-close';
+                tabClose.innerHTML = '×';
+                tabClose.title = 'Cerrar pestaña';
+
+                tabDiv.appendChild(tabName);
+                tabDiv.appendChild(tabNameInput);
+                tabDiv.appendChild(tabClose);
+
+                // Event listeners
+                tabDiv.addEventListener('click', (e) => {
+                    if (e.target !== tabClose && e.target !== tabNameInput) {
+                        this.switchToTab(index);
+                    }
+                });
+
+                tabName.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    this.startRenamingTab(index, tabName, tabNameInput);
+                });
+
+                tabNameInput.addEventListener('blur', () => {
+                    this.finishRenamingTab(index, tabName, tabNameInput);
+                });
+
+                tabNameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.finishRenamingTab(index, tabName, tabNameInput);
+                    }
+                    if (e.key === 'Escape') {
+                        tabNameInput.value = tab.name;
+                        this.finishRenamingTab(index, tabName, tabNameInput);
+                    }
+                });
+
+                tabClose.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.closeTab(index);
+                });
+
+                // Menú contextual (clic derecho)
+                tabDiv.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.contextMenuTabIndex = index;
+                    this.showContextMenu(e.clientX, e.clientY);
+                });
+
+                // Drag & Drop
+                tabDiv.addEventListener('dragstart', (e) => {
+                    this.draggedTab = index;
+                    tabDiv.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                tabDiv.addEventListener('dragend', () => {
+                    tabDiv.classList.remove('dragging');
+                    if (this.dragOverTab !== null) {
+                        const dragOverElement = this.tabsWrapper.children[this.dragOverTab];
+                        if (dragOverElement) {
+                            dragOverElement.classList.remove('drag-over');
+                        }
+                    }
+                    this.draggedTab = null;
+                    this.dragOverTab = null;
+                });
+
+                tabDiv.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    
+                    if (this.dragOverTab !== null && this.dragOverTab !== index) {
+                        const prevElement = this.tabsWrapper.children[this.dragOverTab];
+                        if (prevElement) {
+                            prevElement.classList.remove('drag-over');
+                        }
+                    }
+                    
+                    if (this.draggedTab !== index) {
+                        tabDiv.classList.add('drag-over');
+                        this.dragOverTab = index;
+                    }
+                });
+
+                tabDiv.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (this.draggedTab !== null && this.draggedTab !== index) {
+                        this.reorderTabs(this.draggedTab, index);
+                    }
+                });
+
+                tabDiv.addEventListener('dragleave', () => {
+                    tabDiv.classList.remove('drag-over');
+                });
+
+                return tabDiv;
+            }
+
+            startRenamingTab(index, tabName, tabNameInput) {
+                tabName.style.display = 'none';
+                tabNameInput.style.display = 'block';
+                tabNameInput.focus();
+                tabNameInput.select();
+            }
+
+            finishRenamingTab(index, tabName, tabNameInput) {
+                const newName = tabNameInput.value.trim() || `new ${this.tabCounter++}`;
+                this.tabs[index].name = newName;
+                tabName.textContent = newName;
+                tabName.style.display = 'block';
+                tabNameInput.style.display = 'none';
+                this.saveToLocalStorage();
+            }
+
+            reorderTabs(fromIndex, toIndex) {
+                const [tab] = this.tabs.splice(fromIndex, 1);
+                this.tabs.splice(toIndex, 0, tab);
+                
+                if (this.activeTabIndex === fromIndex) {
+                    this.activeTabIndex = toIndex;
+                } else if (this.activeTabIndex === toIndex && fromIndex < toIndex) {
+                    this.activeTabIndex--;
+                } else if (this.activeTabIndex === toIndex && fromIndex > toIndex) {
+                    this.activeTabIndex++;
+                } else if (fromIndex < this.activeTabIndex && toIndex >= this.activeTabIndex) {
+                    this.activeTabIndex--;
+                } else if (fromIndex > this.activeTabIndex && toIndex <= this.activeTabIndex) {
+                    this.activeTabIndex++;
+                }
+                
+                this.renderTabs();
+                this.saveToLocalStorage();
+            }
+
+            closeTab(index) {
+                if (this.tabs.length === 1) {
+                    // Si es la última pestaña, crear una nueva antes de cerrar
+                    this.createNewTab();
+                }
+                
+                this.tabs.splice(index, 1);
+                
+                if (this.activeTabIndex === index) {
+                    this.activeTabIndex = Math.min(index, this.tabs.length - 1);
+                    if (this.activeTabIndex >= 0) {
+                        this.switchToTab(this.activeTabIndex);
+                    } else {
+                        this.editor.value = '';
+                        this.updateLineNumbers();
+                        this.updateStatusBar();
+                    }
+                } else if (this.activeTabIndex > index) {
+                    this.activeTabIndex--;
+                }
+                
+                this.renderTabs();
+                this.saveToLocalStorage();
+            }
+
+            switchToTab(index) {
+                if (index < 0 || index >= this.tabs.length) return;
+                
+                // Guardar contenido de la pestaña actual
+                if (this.activeTabIndex >= 0) {
+                    this.tabs[this.activeTabIndex].content = this.editor.value;
+                }
+                
+                this.activeTabIndex = index;
+                this.editor.value = this.tabs[index].content;
+                this.renderTabs();
+                this.updateLineNumbers();
+                this.updateStatusBar();
+                this.editor.focus();
+                this.saveToLocalStorage();
+            }
+
+            onEditorChange() {
+                if (this.activeTabIndex >= 0) {
+                    this.tabs[this.activeTabIndex].content = this.editor.value;
+                    this.saveToLocalStorage();
+                }
+                this.updateLineNumbers();
+                this.updateStatusBar();
+            }
+
+            updateLineNumbers() {
+                const lines = this.editor.value.split('\n');
+                const lineCount = lines.length || 1;
+                const lineNumbersText = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n');
+                this.lineNumbers.textContent = lineNumbersText;
+            }
+
+            syncLineNumbers() {
+                this.lineNumbers.scrollTop = this.editor.scrollTop;
+            }
+
+            updateStatusBar() {
+                const text = this.editor.value;
+                const cursorPos = this.editor.selectionStart;
+                const textBeforeCursor = text.substring(0, cursorPos);
+                const lines = textBeforeCursor.split('\n');
+                const line = lines.length;
+                const col = lines[lines.length - 1].length + 1;
+                
+                this.statusLine.textContent = `Línea: ${line}`;
+                this.statusCol.textContent = `Columna: ${col}`;
+            }
+
+            handleKeyDown(e) {
+                // Permitir tabulación con espacios
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = this.editor.selectionStart;
+                    const end = this.editor.selectionEnd;
+                    const value = this.editor.value;
+                    
+                    if (e.shiftKey) {
+                        // Desindentar
+                        const lines = value.substring(0, start).split('\n');
+                        const currentLine = lines.length - 1;
+                        const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+                        const lineText = value.substring(lineStart, start);
+                        
+                        if (lineText.startsWith('    ')) {
+                            this.editor.value = value.substring(0, lineStart) + lineText.substring(4) + value.substring(start);
+                            this.editor.setSelectionRange(Math.max(lineStart, start - 4), Math.max(lineStart, end - 4));
+                            this.onEditorChange();
+                        }
+                    } else {
+                        // Indentar
+                        this.editor.value = value.substring(0, start) + '    ' + value.substring(end);
+                        this.editor.setSelectionRange(start + 4, start + 4);
+                        this.onEditorChange();
+                    }
+                }
+            }
+
+            saveFile() {
+                if (this.activeTabIndex < 0) return;
+                
+                const tab = this.tabs[this.activeTabIndex];
+                
+                // Usar el nombre actual de la pestaña como sugerencia
+                this.saveFileName.value = tab.name;
+                
+                this.showSaveModal();
+            }
+
+            showSaveModal() {
+                this.saveModal.classList.add('active');
+                this.saveFileName.focus();
+                this.saveFileName.select();
+            }
+
+            closeSaveModal() {
+                this.saveModal.classList.remove('active');
+            }
+
+            async confirmSave() {
+                const fullFileName = this.saveFileName.value.trim();
+                
+                if (!fullFileName) {
+                    alert('Por favor ingrese un nombre para el archivo');
+                    this.saveFileName.focus();
+                    return;
+                }
+                
+                const tab = this.tabs[this.activeTabIndex];
+                const content = this.editor.value;
+                
+                // Detectar extensión del nombre del archivo
+                const lastDot = fullFileName.lastIndexOf('.');
+                let fileExtension = '';
+                if (lastDot > 0 && lastDot < fullFileName.length - 1) {
+                    fileExtension = fullFileName.substring(lastDot);
+                }
+                
+                // Determinar el tipo MIME basado en la extensión detectada
+                const mimeTypes = {
+                    '.txt': 'text/plain',
+                    '.html': 'text/html',
+                    '.htm': 'text/html',
+                    '.css': 'text/css',
+                    '.js': 'application/javascript',
+                    '.json': 'application/json',
+                    '.xml': 'application/xml',
+                    '.md': 'text/markdown',
+                    '.py': 'text/x-python',
+                    '.java': 'text/x-java-source',
+                    '.cpp': 'text/x-c++src',
+                    '.c': 'text/x-csrc',
+                    '.cs': 'text/x-csharp',
+                    '.php': 'text/x-php',
+                    '.rb': 'text/x-ruby',
+                    '.go': 'text/x-go',
+                    '.rs': 'text/x-rust',
+                    '.sql': 'text/x-sql',
+                    '.sh': 'text/x-shellscript',
+                    '.bat': 'text/x-msdos-batch',
+                    '.ps1': 'text/x-powershell',
+                    '.log': 'text/plain',
+                    '.csv': 'text/csv',
+                    '.yaml': 'text/yaml',
+                    '.yml': 'text/yaml',
+                    '.ini': 'text/plain',
+                    '.conf': 'text/plain',
+                    '.env': 'text/plain'
+                };
+                
+                const mimeType = mimeTypes[fileExtension.toLowerCase()] || 'text/plain';
+                
+                try {
+                    if ('showSaveFilePicker' in window) {
+                        // File System Access API
+                        const acceptTypes = {};
+                        if (fileExtension) {
+                            acceptTypes[mimeType] = [fileExtension];
+                        }
+                        
+                        const options = {
+                            suggestedName: fullFileName,
+                            types: fileExtension ? [{
+                                description: `Archivo ${fileExtension}`,
+                                accept: acceptTypes
+                            }] : []
+                        };
+                        
+                        const fileHandle = await window.showSaveFilePicker(options);
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(content);
+                        await writable.close();
+                        
+                        tab.saved = true;
+                        tab.name = fileHandle.name;
+                        this.renderTabs();
+                        this.saveToLocalStorage();
+                        
+                        this.closeSaveModal();
+                        alert('Archivo guardado exitosamente');
+                    } else {
+                        // Fallback para navegadores que no soportan File System Access API
+                        const blob = new Blob([content], { type: mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = fullFileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        
+                        tab.saved = true;
+                        tab.name = fullFileName;
+                        this.renderTabs();
+                        this.saveToLocalStorage();
+                        
+                        this.closeSaveModal();
+                        alert('Archivo descargado exitosamente');
+                    }
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        console.error('Error al guardar:', error);
+                        alert('Error al guardar el archivo');
+                    }
+                }
+            }
+
+            saveToLocalStorage() {
+                try {
+                    const data = {
+                        tabs: this.tabs,
+                        activeTabIndex: this.activeTabIndex,
+                        tabCounter: this.tabCounter
+                    };
+                    localStorage.setItem('textEditorData', JSON.stringify(data));
+                } catch (error) {
+                    console.error('Error al guardar en localStorage:', error);
+                }
+            }
+
+            loadFromLocalStorage() {
+                try {
+                    const data = localStorage.getItem('textEditorData');
+                    if (data) {
+                        const parsed = JSON.parse(data);
+                        this.tabs = parsed.tabs || [];
+                        this.activeTabIndex = parsed.activeTabIndex || 0;
+                        this.tabCounter = parsed.tabCounter || 1;
+                        
+                        if (this.tabs.length > 0) {
+                            if (this.activeTabIndex >= 0 && this.activeTabIndex < this.tabs.length) {
+                                this.renderTabs();
+                                this.switchToTab(this.activeTabIndex);
+                            } else {
+                                this.renderTabs();
+                                this.switchToTab(0);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error al cargar desde localStorage:', error);
+                }
+            }
+
+            // Funciones de editor (copiar, pegar, cortar)
+            copy() {
+                const selectedText = this.editor.value.substring(
+                    this.editor.selectionStart,
+                    this.editor.selectionEnd
+                );
+                if (selectedText) {
+                    navigator.clipboard.writeText(selectedText).catch(err => {
+                        console.error('Error al copiar:', err);
+                        // Fallback
+                        const textArea = document.createElement('textarea');
+                        textArea.value = selectedText;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                    });
+                }
+            }
+
+            paste() {
+                navigator.clipboard.readText().then(text => {
+                    const start = this.editor.selectionStart;
+                    const end = this.editor.selectionEnd;
+                    const value = this.editor.value;
+                    this.editor.value = value.substring(0, start) + text + value.substring(end);
+                    this.editor.setSelectionRange(start + text.length, start + text.length);
+                    this.onEditorChange();
+                    this.editor.focus();
+                }).catch(err => {
+                    console.error('Error al pegar:', err);
+                });
+            }
+
+            cut() {
+                const selectedText = this.editor.value.substring(
+                    this.editor.selectionStart,
+                    this.editor.selectionEnd
+                );
+                if (selectedText) {
+                    this.copy();
+                    const start = this.editor.selectionStart;
+                    const end = this.editor.selectionEnd;
+                    const value = this.editor.value;
+                    this.editor.value = value.substring(0, start) + value.substring(end);
+                    this.editor.setSelectionRange(start, start);
+                    this.onEditorChange();
+                }
+            }
+
+            // Funciones de búsqueda y reemplazo
+            toggleSearchPanel() {
+                const isActive = this.searchPanel.classList.contains('active');
+                if (isActive) {
+                    this.closeSearchPanel();
+                } else {
+                    this.searchPanel.classList.add('active');
+                    this.searchInput.focus();
+                    this.searchInput.select();
+                }
+            }
+
+            closeSearchPanel() {
+                this.searchPanel.classList.remove('active');
+                this.searchResultsElement.textContent = '';
+                this.searchResults = [];
+                this.currentSearchIndex = -1;
+                this.editor.focus();
+            }
+
+            searchNext() {
+                const searchText = this.searchInput.value;
+                if (!searchText) return;
+
+                const caseSensitive = this.caseSensitive.checked;
+                const text = caseSensitive ? this.editor.value : this.editor.value.toLowerCase();
+                const search = caseSensitive ? searchText : searchText.toLowerCase();
+                
+                const startPos = this.editor.selectionEnd;
+                const index = text.indexOf(search, startPos);
+                
+                if (index !== -1) {
+                    this.editor.setSelectionRange(index, index + searchText.length);
+                    this.editor.focus();
+                    this.updateSearchResults();
+                } else {
+                    // Buscar desde el inicio si no se encuentra
+                    const firstIndex = text.indexOf(search);
+                    if (firstIndex !== -1) {
+                        this.editor.setSelectionRange(firstIndex, firstIndex + searchText.length);
+                        this.editor.focus();
+                        this.updateSearchResults();
+                    } else {
+                        this.searchResultsElement.textContent = 'No se encontró el texto';
+                    }
+                }
+            }
+
+            searchPrev() {
+                const searchText = this.searchInput.value;
+                if (!searchText) return;
+
+                const caseSensitive = this.caseSensitive.checked;
+                const text = caseSensitive ? this.editor.value : this.editor.value.toLowerCase();
+                const search = caseSensitive ? searchText : searchText.toLowerCase();
+                
+                const startPos = this.editor.selectionStart;
+                const lastIndex = text.lastIndexOf(search, startPos - 1);
+                
+                if (lastIndex !== -1) {
+                    this.editor.setSelectionRange(lastIndex, lastIndex + searchText.length);
+                    this.editor.focus();
+                    this.updateSearchResults();
+                } else {
+                    // Buscar desde el final si no se encuentra
+                    const finalIndex = text.lastIndexOf(search);
+                    if (finalIndex !== -1) {
+                        this.editor.setSelectionRange(finalIndex, finalIndex + searchText.length);
+                        this.editor.focus();
+                        this.updateSearchResults();
+                    } else {
+                        this.searchResultsElement.textContent = 'No se encontró el texto';
+                    }
+                }
+            }
+
+            updateSearchResults() {
+                const searchText = this.searchInput.value;
+                if (!searchText) {
+                    this.searchResultsElement.textContent = '';
+                    return;
+                }
+
+                const caseSensitive = this.caseSensitive.checked;
+                const text = caseSensitive ? this.editor.value : this.editor.value.toLowerCase();
+                const search = caseSensitive ? searchText : searchText.toLowerCase();
+                
+                const regex = new RegExp(this.escapeRegex(search), caseSensitive ? 'g' : 'gi');
+                const matches = this.editor.value.match(regex);
+                const count = matches ? matches.length : 0;
+                
+                if (count > 0) {
+                    const currentMatch = this.getCurrentMatchIndex();
+                    this.searchResultsElement.textContent = `${currentMatch + 1} de ${count} coincidencias`;
+                } else {
+                    this.searchResultsElement.textContent = 'No se encontró el texto';
+                }
+            }
+
+            getCurrentMatchIndex() {
+                const searchText = this.searchInput.value;
+                if (!searchText) return -1;
+
+                const caseSensitive = this.caseSensitive.checked;
+                const text = caseSensitive ? this.editor.value : this.editor.value.toLowerCase();
+                const search = caseSensitive ? searchText : searchText.toLowerCase();
+                
+                const beforeCursor = this.editor.value.substring(0, this.editor.selectionStart);
+                const beforeCursorLower = caseSensitive ? beforeCursor : beforeCursor.toLowerCase();
+                const regex = new RegExp(this.escapeRegex(search), caseSensitive ? 'g' : 'gi');
+                const matches = beforeCursorLower.match(regex);
+                
+                return matches ? matches.length - 1 : -1;
+            }
+
+            escapeRegex(str) {
+                return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            }
+
+            searchAllTabs() {
+                const searchText = this.searchInput.value;
+                if (!searchText) {
+                    this.searchResultsElement.textContent = 'Ingrese un texto para buscar';
+                    return;
+                }
+
+                const caseSensitive = this.caseSensitive.checked;
+                const results = [];
+                let totalMatches = 0;
+
+                this.tabs.forEach((tab, index) => {
+                    const content = caseSensitive ? tab.content : tab.content.toLowerCase();
+                    const search = caseSensitive ? searchText : searchText.toLowerCase();
+                    const regex = new RegExp(this.escapeRegex(search), caseSensitive ? 'g' : 'gi');
+                    const matches = tab.content.match(regex);
+                    const count = matches ? matches.length : 0;
+                    
+                    if (count > 0) {
+                        results.push({
+                            tabIndex: index,
+                            tabName: tab.name,
+                            count: count
+                        });
+                        totalMatches += count;
+                    }
+                });
+
+                if (results.length > 0) {
+                    let resultText = `Encontrado en ${results.length} pestaña(s), ${totalMatches} coincidencia(s) total:\n`;
+                    results.forEach(result => {
+                        resultText += `  • ${result.tabName}: ${result.count} coincidencia(s)\n`;
+                    });
+                    this.searchResultsElement.textContent = resultText;
+                    
+                    // Cambiar a la primera pestaña con resultados
+                    this.switchToTab(results[0].tabIndex);
+                    this.searchNext();
+                } else {
+                    this.searchResultsElement.textContent = 'No se encontró el texto en ninguna pestaña';
+                }
+            }
+
+            replace() {
+                const searchText = this.searchInput.value;
+                const replaceText = this.replaceInput.value;
+                
+                if (!searchText) return;
+
+                const selectedText = this.editor.value.substring(
+                    this.editor.selectionStart,
+                    this.editor.selectionEnd
+                );
+                
+                const caseSensitive = this.caseSensitive.checked;
+                const matches = caseSensitive 
+                    ? selectedText === searchText
+                    : selectedText.toLowerCase() === searchText.toLowerCase();
+                
+                if (matches) {
+                    const start = this.editor.selectionStart;
+                    const end = this.editor.selectionEnd;
+                    const value = this.editor.value;
+                    this.editor.value = value.substring(0, start) + replaceText + value.substring(end);
+                    this.editor.setSelectionRange(start + replaceText.length, start + replaceText.length);
+                    this.onEditorChange();
+                    this.updateSearchResults();
+                } else {
+                    this.searchNext();
+                }
+            }
+
+            replaceAll() {
+                const searchText = this.searchInput.value;
+                const replaceText = this.replaceInput.value;
+                
+                if (!searchText) return;
+
+                const caseSensitive = this.caseSensitive.checked;
+                const regex = new RegExp(this.escapeRegex(searchText), caseSensitive ? 'g' : 'gi');
+                
+                if (this.searchAllTabs.checked) {
+                    // Reemplazar en todas las pestañas
+                    let totalReplaced = 0;
+                    this.tabs.forEach((tab, index) => {
+                        const matches = tab.content.match(regex);
+                        if (matches) {
+                            const originalContent = tab.content;
+                            tab.content = tab.content.replace(regex, replaceText);
+                            totalReplaced += matches.length;
+                            
+                            if (index === this.activeTabIndex) {
+                                this.editor.value = tab.content;
+                                this.onEditorChange();
+                            }
+                        }
+                    });
+                    
+                    this.saveToLocalStorage();
+                    this.searchResultsElement.textContent = `Reemplazadas ${totalReplaced} coincidencia(s) en todas las pestañas`;
+                } else {
+                    // Reemplazar solo en la pestaña actual
+                    const matches = this.editor.value.match(regex);
+                    if (matches) {
+                        this.editor.value = this.editor.value.replace(regex, replaceText);
+                        this.onEditorChange();
+                        this.searchResultsElement.textContent = `Reemplazadas ${matches.length} coincidencia(s)`;
+                    } else {
+                        this.searchResultsElement.textContent = 'No se encontró el texto';
+                    }
+                }
+            }
+
+            // Menú contextual
+            showContextMenu(x, y) {
+                this.tabContextMenu.style.left = x + 'px';
+                this.tabContextMenu.style.top = y + 'px';
+                this.tabContextMenu.classList.add('active');
+            }
+
+            renameTabFromContext() {
+                if (this.contextMenuTabIndex >= 0) {
+                    const tabElement = this.tabsWrapper.children[this.contextMenuTabIndex];
+                    if (tabElement) {
+                        const tabName = tabElement.querySelector('.tab-name');
+                        const tabNameInput = tabElement.querySelector('.tab-name-input');
+                        this.startRenamingTab(this.contextMenuTabIndex, tabName, tabNameInput);
+                    }
+                }
+                this.tabContextMenu.classList.remove('active');
+            }
+
+            closeTabFromContext() {
+                if (this.contextMenuTabIndex >= 0) {
+                    this.closeTab(this.contextMenuTabIndex);
+                }
+                this.tabContextMenu.classList.remove('active');
+            }
+
+            // Funciones de tema
+            toggleTheme() {
+                const isDarkMode = document.body.classList.toggle('dark-mode');
+                this.saveTheme(isDarkMode);
+                this.updateThemeIcon(isDarkMode);
+            }
+
+            loadTheme() {
+                try {
+                    const savedTheme = localStorage.getItem('textEditorTheme');
+                    if (savedTheme === 'dark') {
+                        document.body.classList.add('dark-mode');
+                        this.updateThemeIcon(true);
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                        this.updateThemeIcon(false);
+                    }
+                } catch (error) {
+                    console.error('Error al cargar el tema:', error);
+                }
+            }
+
+            saveTheme(isDarkMode) {
+                try {
+                    localStorage.setItem('textEditorTheme', isDarkMode ? 'dark' : 'light');
+                } catch (error) {
+                    console.error('Error al guardar el tema:', error);
+                }
+            }
+
+            updateThemeIcon(isDarkMode) {
+                this.btnThemeToggle.textContent = isDarkMode ? '☀️' : '🌙';
+                this.btnThemeToggle.title = isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+            }
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', () => {
+            new TextEditor();
+        });
+    </script>
+</body>
+</html>
