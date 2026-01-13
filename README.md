@@ -43,4 +43,4 @@ Incluye **pestañas**, **numeración de líneas**, **buscar/reemplazar**, **modo
 ### Opción 1: Abrir local
 1. Descarga o clona el repo:
    ```bash
-   [git clone https://github.com/tu-usuario/tu-repo.git](https://github.com/PatrickCabezas/notepad.git)
+   git clone https://github.com/tu-usuario/tu-repo.git
