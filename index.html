@@ -714,7 +714,14 @@
                 this.initEventListeners();
                 this.loadTheme();
                 this.loadFromLocalStorage();
+                if (this.tabs.length === 0) {
                 this.createNewTab();
+                } else {
+                    // Asegura que se muestre la pestaña activa cargada
+                    const safeIndex = (this.activeTabIndex >= 0 && this.activeTabIndex < this.tabs.length) ? this.activeTabIndex : 0;
+                    this.renderTabs();
+                    this.switchToTab(safeIndex);
+                }
             }
 
             initElements() {
@@ -1274,31 +1281,22 @@
                     console.error('Error al guardar en localStorage:', error);
                 }
             }
-
             loadFromLocalStorage() {
                 try {
                     const data = localStorage.getItem('textEditorData');
                     if (data) {
                         const parsed = JSON.parse(data);
                         this.tabs = parsed.tabs || [];
-                        this.activeTabIndex = parsed.activeTabIndex || 0;
+                        this.activeTabIndex = (typeof parsed.activeTabIndex === "number") ? parsed.activeTabIndex : 0;
                         this.tabCounter = parsed.tabCounter || 1;
-                        
-                        if (this.tabs.length > 0) {
-                            if (this.activeTabIndex >= 0 && this.activeTabIndex < this.tabs.length) {
-                                this.renderTabs();
-                                this.switchToTab(this.activeTabIndex);
-                            } else {
-                                this.renderTabs();
-                                this.switchToTab(0);
-                            }
-                        }
                     }
                 } catch (error) {
                     console.error('Error al cargar desde localStorage:', error);
+                    this.tabs = [];
+                    this.activeTabIndex = 0;
+                    this.tabCounter = 1;
                 }
             }
-
             // Funciones de editor (copiar, pegar, cortar)
             copy() {
                 const selectedText = this.editor.value.substring(
